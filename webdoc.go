@@ -18,9 +18,8 @@ type Doc struct {
 }
 
 type Info struct {
-	Routes        map[string]Info `json:"routes,omitempty"`
-	Method        string          `json:"method,omitempty"`
-	Documentation *Doc            `json:"documentation,omitempty"`
+	Routes  map[string]Info `json:"routes,omitempty"`
+	Methods map[string]*Doc `json:"methods,omitempty"`
 }
 
 type Mux struct {
@@ -42,7 +41,7 @@ func (m *Mux) Mux() *web.Mux {
 }
 
 // muxMap adds the route to the webdoc.DocMap
-func muxMap(m *Mux, method string, pattern web.PatternType, handler web.HandlerType, doc Doc) {
+func muxMap(m *Mux, method string, pattern web.PatternType, handler web.HandlerType, doc *Doc) {
 	sPattern := fmt.Sprintf("%+v", pattern)
 
 	// now we need an string to work with.
@@ -56,8 +55,17 @@ func muxMap(m *Mux, method string, pattern web.PatternType, handler web.HandlerT
 		// make the new root groop if it doesnt exists.
 		if _, ok := m.DocMap[workString]; !ok {
 			m.DocMap[workString] = Info{
-				Method:        strings.ToUpper(method),
-				Documentation: &doc,
+				Methods: map[string]*Doc{strings.ToUpper(method): doc},
+			}
+		} else {
+			ma := make(map[string]*Doc)
+			for k, v := range m.DocMap[workString].Methods {
+				ma[k] = v
+			}
+			ma[strings.ToUpper(method)] = doc
+
+			m.DocMap[workString] = Info{
+				Methods: ma,
 			}
 		}
 
@@ -65,11 +73,28 @@ func muxMap(m *Mux, method string, pattern web.PatternType, handler web.HandlerT
 	}
 
 	parts := strings.Split(workString, "/")
-	_ = addParts(m.DocMap, parts, Info{
-		Method:        strings.ToUpper(method),
-		Documentation: &doc,
-	})
 
+	// Add missing URL Param to doc.
+	// This will save some typing.
+	for _, v := range parts {
+		if string(v[0]) == ":" {
+			if doc == nil {
+				doc = &Doc{
+					URLParams: make(map[string]string),
+				}
+			}
+
+			if doc.URLParams == nil {
+				doc.URLParams = make(map[string]string)
+			}
+
+			if "" == doc.URLParams[v] {
+				doc.URLParams[v[1:]] = "string"
+			}
+		}
+	}
+
+	_ = addParts(m.DocMap, parts, strings.ToUpper(method), doc)
 }
 
 // muxMap adds the nested routes to the webdoc.DocMap
@@ -88,6 +113,7 @@ func handleMap(m *Mux, submux *Mux, pattern web.PatternType) {
 	// it the workstring is empty we are on root.
 	if workString == "" {
 		workString = "/"
+
 		// make the new root groop if it doesnt exists.
 		if _, ok := m.DocMap[workString]; !ok {
 			m.DocMap[workString] = Info{
@@ -104,32 +130,45 @@ func handleMap(m *Mux, submux *Mux, pattern web.PatternType) {
 	}
 
 	parts := strings.Split(workString, "/")
-	target := addParts(m.DocMap, parts, Info{})
+	target := addParts(m.DocMap, parts, "", nil)
 
 	for k, v := range submux.DocMap {
 		target.Routes[k] = v
 	}
 }
 
-func addParts(target map[string]Info, parts []string, info Info) Info {
+func addParts(target map[string]Info, parts []string, method string, doc *Doc) Info {
 	key := "/" + parts[0]
 
 	if _, ok := target[key]; !ok {
 		if len(parts[1:]) == 0 {
 			target[key] = Info{
-				Routes:        make(map[string]Info),
-				Method:        info.Method,
-				Documentation: info.Documentation,
+				Routes:  make(map[string]Info),
+				Methods: map[string]*Doc{strings.ToUpper(method): doc},
 			}
 		} else {
 			target[key] = Info{
 				Routes: make(map[string]Info),
 			}
 		}
+	} else {
+		if len(parts[1:]) == 0 {
+			ma := make(map[string]*Doc)
+			for k, v := range target[key].Methods {
+				ma[k] = v
+			}
+
+			ma[method] = doc
+
+			target[key] = Info{
+				Routes:  make(map[string]Info),
+				Methods: ma,
+			}
+		}
 	}
 
 	if len(parts[1:]) > 0 {
-		return addParts(target[key].Routes, parts[1:], info)
+		return addParts(target[key].Routes, parts[1:], method, doc)
 	}
 
 	return target[key]
@@ -164,47 +203,47 @@ func (m *Mux) Handle(pattern web.PatternType, submux *Mux) {
 	m.webmux.Handle(pattern, submux.Mux())
 }
 
-func (m *Mux) Connect(pattern web.PatternType, handler web.HandlerType, doc Doc) {
+func (m *Mux) Connect(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
 	muxMap(m, "connect", pattern, handler, doc)
 	m.webmux.Connect(pattern, handler)
 }
 
-func (m *Mux) Delete(pattern web.PatternType, handler web.HandlerType, doc Doc) {
+func (m *Mux) Delete(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
 	muxMap(m, "delete", pattern, handler, doc)
 	m.webmux.Delete(pattern, handler)
 }
 
-func (m *Mux) Get(pattern web.PatternType, handler web.HandlerType, doc Doc) {
+func (m *Mux) Get(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
 	muxMap(m, "get", pattern, handler, doc)
 	m.webmux.Get(pattern, handler)
 }
 
-func (m *Mux) Head(pattern web.PatternType, handler web.HandlerType, doc Doc) {
+func (m *Mux) Head(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
 	muxMap(m, "head", pattern, handler, doc)
 	m.webmux.Head(pattern, handler)
 }
 
-func (m *Mux) Options(pattern web.PatternType, handler web.HandlerType, doc Doc) {
+func (m *Mux) Options(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
 	muxMap(m, "options", pattern, handler, doc)
 	m.webmux.Options(pattern, handler)
 }
 
-func (m *Mux) Patch(pattern web.PatternType, handler web.HandlerType, doc Doc) {
+func (m *Mux) Patch(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
 	muxMap(m, "patch", pattern, handler, doc)
 	m.webmux.Patch(pattern, handler)
 }
 
-func (m *Mux) Post(pattern web.PatternType, handler web.HandlerType, doc Doc) {
+func (m *Mux) Post(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
 	muxMap(m, "post", pattern, handler, doc)
 	m.webmux.Post(pattern, handler)
 }
 
-func (m *Mux) Put(pattern web.PatternType, handler web.HandlerType, doc Doc) {
+func (m *Mux) Put(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
 	muxMap(m, "put", pattern, handler, doc)
 	m.webmux.Put(pattern, handler)
 }
 
-func (m *Mux) Trace(pattern web.PatternType, handler web.HandlerType, doc Doc) {
+func (m *Mux) Trace(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
 	muxMap(m, "trace", pattern, handler, doc)
 	m.webmux.Trace(pattern, handler)
 }
