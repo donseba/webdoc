@@ -1,7 +1,9 @@
 # webdoc
-An [goji](https://github.com/zenazn/goji) web.Mux wrapper that allows you to add documentation to routes.
+An [goji](https://github.com/goji/goji) Mux wrapper that allows you to add documentation to routes. 
 
-This package is an simple wrapper around goji's web structure, adding functionality to document the API routes.
+Please not to `go get goji.io`
+
+This package is an simple wrapper around goji's mux struct, adding functionality to document the API routes.
 
 **Please keep in mind that this package in still under development
 
@@ -11,21 +13,24 @@ import (
         "fmt"
         "net/http"
 
+        "goji.io"
+        "goji.io/pat"
+
         "github.com/donseba/webdoc"
-        "github.com/zenazn/goji"
-        "github.com/zenazn/goji/web"
 )
 
 var Doc map[string]webdoc.Info
 
-// This is an simple documantation line for the function hello
-// Hello will output the string after hello/
-func hello(c web.C, w http.ResponseWriter, r *http.Request) {
-        fmt.Fprintf(w, "Hello, %s!", c.URLParams["name"])
+
+//hello will say hello to :name
+func hello(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+        name := pat.Param(ctx, "name")
+        fmt.Fprintf(w, "Hello, %s!", name)
 }
 
-func hello(c web.C, w http.ResponseWriter, r *http.Request) {
-		out, err := json.Marshal(core.DocMap)
+//routes will output an json of routes
+func routes(c context.Context, w http.ResponseWriter, r *http.Request) {
+	out, err := json.Marshal(core.DocMap)
         if err != nil {
             panic(err)
         }
@@ -34,19 +39,19 @@ func hello(c web.C, w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-		// instead of web.New()
+	// instead of web.New()
         wd := webdoc.New()
 
         wd.Get("/hello/:name", hello, webdoc.Doc{Title: "Say hello", Description: "Say hello to :name"})
-        wd.Get("/hello/:banana", hello, webdoc.Doc{Title: "Say hello", Description: "Say hello to :banana"})
         wd.Get("/routes", routes, webdoc.Doc{Title: "API Routes", Description: "Retrieve the list of API Routes in JSON format"})
 
-		// Assing doc to an global variable
-		Doc = wd.DocMap
+	// Assing doc to an global variable
+	Doc = wd.DocMap
 
-
-        goji.Handle("/*", wd.Mux() )
-        goji.Serve()
+	mux := goji.NewMux()
+        mux.Handle(pat.New("/*"), wd.Mux())
+        
+        http.ListenAndServe("localhost:8080", mux)
 }
 ```
 
@@ -55,31 +60,41 @@ Running the example and pointing the browser to `/routes`
 Would return the following :
 ``` json
 {
+	"/": {
+		"methods": {
+			"GET": {
+				"title": "Index",
+				"description": "Index Page"
+			}
+		}
+	},
 	"/hello": {
 		"routes": {
-			"/:banana": {
-				"method": "GET",
-				"documentation": {
-					"title": "Say Hello",
-					"description": "Say hello to :banana"
-				}
-			},
 			"/:name": {
-				"method": "GET",
-				"documentation": {
-					"title": "Say Hello",
-					"description": "Say hello to :name"
+				"methods": {
+					"GET": {
+						"documentation": {
+							"title": "Say Hello",
+							"description": "Say hello to :name"
+						}
+					},
+					"PUT": {
+						"documentation": {
+							"title": "Put some data",
+							"description": "Say hello to :name"
+						}
+					}
 				}
 			}
 		}
 	},
 	"/routes": {
-		"method": "GET",
-		"documentation": {
-			"Title": "API Routes",
-			"Description": "Retrieve the list of API Routes in JSON format"
+		"methods": {
+			"GET": {
+				"Title": "API Routes",
+				"Description": "Retrieve the list of API Routes in JSON format"
+			}
 		}
 	}
 }
-
 ```
