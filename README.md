@@ -10,13 +10,13 @@ This package is an simple wrapper around goji's mux struct, adding functionality
 ## Example
 ``` go
 import (
-        "fmt"
-        "net/http"
+    "fmt"
+    "net/http"
+    
+    "goji.io"
+    "goji.io/pat"
 
-        "goji.io"
-        "goji.io/pat"
-
-        "github.com/donseba/webdoc"
+    "github.com/donseba/webdoc"
 )
 
 var Doc map[string]webdoc.Info
@@ -24,34 +24,34 @@ var Doc map[string]webdoc.Info
 
 //hello will say hello to :name
 func hello(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-        name := pat.Param(ctx, "name")
-        fmt.Fprintf(w, "Hello, %s!", name)
+    name := pat.Param(ctx, "name")
+    fmt.Fprintf(w, "Hello, %s!", name)
 }
 
 //routes will output an json of routes
 func routes(c context.Context, w http.ResponseWriter, r *http.Request) {
-	out, err := json.Marshal(core.DocMap)
-        if err != nil {
-            panic(err)
-        }
+    out, err := json.Marshal(core.DocMap)
+    if err != nil {
+        panic(err)
+    }
 
-        fmt.Fprint(w, out)
+    fmt.Fprint(w, out)
 }
 
 func main() {
-	// instead of web.New()
-        wd := webdoc.New()
+    // instead of web.New()
+    wd := webdoc.New()
+    
+    wd.Get("/hello/:name", hello, webdoc.Doc{Title: "Say hello", Description: "Say hello to :name"})
+    wd.Get("/routes", routes, webdoc.Doc{Title: "API Routes", Description: "Retrieve the list of API Routes in JSON format"})
+    
+    // Assing doc to an global variable
+    Doc = wd.DocMap
 
-        wd.Get("/hello/:name", hello, webdoc.Doc{Title: "Say hello", Description: "Say hello to :name"})
-        wd.Get("/routes", routes, webdoc.Doc{Title: "API Routes", Description: "Retrieve the list of API Routes in JSON format"})
-
-	// Assing doc to an global variable
-	Doc = wd.DocMap
-
-	mux := goji.NewMux()
-        mux.Handle(pat.New("/*"), wd.Mux())
+    mux := goji.NewMux()
+    mux.Handle(pat.New("/*"), wd.Mux())
         
-        http.ListenAndServe("localhost:8080", mux)
+    http.ListenAndServe("localhost:8080", mux)
 }
 ```
 
