@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/zenazn/goji/web"
+	"goji.io"
+	"goji.io/pat"
+	"golang.org/x/net/context"
 )
 
 type Doc struct {
@@ -23,25 +25,25 @@ type Info struct {
 }
 
 type Mux struct {
-	webmux *web.Mux        // goji's web.Mux
+	webmux *goji.Mux       // goji's web.Mux
 	DocMap map[string]Info // Doc Map
 }
 
 //New creates a new webdoc.Mux
 func New() *Mux {
 	return &Mux{
-		webmux: web.New(),
+		webmux: goji.NewMux(),
 		DocMap: make(map[string]Info),
 	}
 }
 
 //Mux returns the goji's *web.Mux
-func (m *Mux) Mux() *web.Mux {
+func (m *Mux) Mux() *goji.Mux {
 	return m.webmux
 }
 
 // muxMap adds the route to the webdoc.DocMap
-func muxMap(m *Mux, method string, pattern web.PatternType, handler web.HandlerType, doc *Doc) {
+func muxMap(m *Mux, method string, pattern string, handler goji.Handler, doc *Doc) {
 	sPattern := fmt.Sprintf("%+v", pattern)
 
 	// now we need an string to work with.
@@ -98,7 +100,7 @@ func muxMap(m *Mux, method string, pattern web.PatternType, handler web.HandlerT
 }
 
 // muxMap adds the nested routes to the webdoc.DocMap
-func handleMap(m *Mux, submux *Mux, pattern web.PatternType) {
+func handleMap(m *Mux, submux *Mux, pattern string) {
 	sPattern := fmt.Sprintf("%+v", pattern)
 
 	// check if the group string ends with `/*`
@@ -178,72 +180,55 @@ func (m *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.webmux.ServeHTTP(w, r)
 }
 
-func (m *Mux) ServeHTTPC(c web.C, w http.ResponseWriter, r *http.Request) {
+func (m *Mux) ServeHTTPC(c context.Context, w http.ResponseWriter, r *http.Request) {
 	m.webmux.ServeHTTPC(c, w, r)
 }
 
-func (m *Mux) Use(middleware web.MiddlewareType) {
+func (m *Mux) Use(middleware func(http.Handler) http.Handler) {
 	m.webmux.Use(middleware)
 }
 
-func (m *Mux) Insert(middleware, before web.MiddlewareType) error {
-	return m.webmux.Insert(middleware, before)
+func (m *Mux) UseC(middleware func(goji.Handler) goji.Handler) {
+	m.webmux.UseC(middleware)
 }
 
-func (m *Mux) Abandon(middleware web.MiddlewareType) error {
-	return m.webmux.Abandon(middleware)
-}
-
-func (m *Mux) Router(c *web.C, h http.Handler) http.Handler {
-	return m.webmux.Router(c, h)
-}
-
-func (m *Mux) Handle(pattern web.PatternType, submux *Mux) {
+func (m *Mux) Handle(pattern string, submux *Mux) {
 	handleMap(m, submux, pattern)
-	m.webmux.Handle(pattern, submux.Mux())
+	m.webmux.Handle(pat.New(pattern), submux.Mux())
 }
 
-func (m *Mux) Connect(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
-	muxMap(m, "connect", pattern, handler, doc)
-	m.webmux.Connect(pattern, handler)
-}
-
-func (m *Mux) Delete(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
+func (m *Mux) Delete(pattern string, handler goji.Handler, doc *Doc) {
 	muxMap(m, "delete", pattern, handler, doc)
-	m.webmux.Delete(pattern, handler)
+	m.webmux.HandleC(pat.Delete(pattern), handler)
 }
 
-func (m *Mux) Get(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
+func (m *Mux) Get(pattern string, handler goji.Handler, doc *Doc) {
 	muxMap(m, "get", pattern, handler, doc)
-	m.webmux.Get(pattern, handler)
+
+	m.webmux.HandleC(pat.Get(pattern), handler)
 }
 
-func (m *Mux) Head(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
+func (m *Mux) Head(pattern string, handler goji.Handler, doc *Doc) {
 	muxMap(m, "head", pattern, handler, doc)
-	m.webmux.Head(pattern, handler)
+	m.webmux.HandleC(pat.Head(pattern), handler)
 }
 
-func (m *Mux) Options(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
+func (m *Mux) Options(pattern string, handler goji.Handler, doc *Doc) {
 	muxMap(m, "options", pattern, handler, doc)
-	m.webmux.Options(pattern, handler)
+	m.webmux.HandleC(pat.Options(pattern), handler)
 }
 
-func (m *Mux) Patch(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
+func (m *Mux) Patch(pattern string, handler goji.Handler, doc *Doc) {
 	muxMap(m, "patch", pattern, handler, doc)
-	m.webmux.Patch(pattern, handler)
+	m.webmux.HandleC(pat.Patch(pattern), handler)
 }
 
-func (m *Mux) Post(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
+func (m *Mux) Post(pattern string, handler goji.Handler, doc *Doc) {
 	muxMap(m, "post", pattern, handler, doc)
-	m.webmux.Post(pattern, handler)
+	m.webmux.HandleC(pat.Post(pattern), handler)
 }
 
-func (m *Mux) Put(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
+func (m *Mux) Put(pattern string, handler goji.Handler, doc *Doc) {
 	muxMap(m, "put", pattern, handler, doc)
-	m.webmux.Put(pattern, handler)
-}
-
-func (m *Mux) Trace(pattern web.PatternType, handler web.HandlerType, doc *Doc) {
-	muxMap(m, "trace", pattern, handler, doc)
-	m.webmux.Trace(pattern, handler)
+	m.webmux.HandleC(pat.Put(pattern), handler)
 }
