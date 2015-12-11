@@ -1,7 +1,7 @@
 # webdoc
 An [goji](https://github.com/goji/goji) Mux wrapper that allows you to add documentation to routes. 
 
-Please not to `go get goji.io`
+Please note to use `go get goji.io`
 
 This package is an simple wrapper around goji's mux struct, adding functionality to document the API routes.
 
