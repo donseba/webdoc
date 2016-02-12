@@ -37,6 +37,15 @@ func New() *Mux {
 	}
 }
 
+// NewSub creates a new goji.SubMux()
+func NewSub() *Mux {
+	return &Mux{
+		webmux: goji.SubMux(),
+		DocMap: make(map[string]Info),
+	}
+}
+
+
 //Mux returns the goji's *web.Mux
 func (m *Mux) Mux() *goji.Mux {
 	return m.webmux
